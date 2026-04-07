@@ -14,6 +14,7 @@ export default function App() {
   const [chatService, setChatService] = useState<RajChatService | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
+  const [voiceName, setVoiceName] = useState<'Puck' | 'Aoede'>('Puck');
   const [liveTranscript, setLiveTranscript] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -81,7 +82,7 @@ export default function App() {
     
     try {
       setIsLive(true);
-      const sessionPromise = chatService.connectLive({
+      const sessionPromise = chatService.connectLive(voiceName, {
         onopen: () => {
           console.log('Live session opened');
           audioRecorderRef.current.start((base64Data) => {
@@ -133,6 +134,16 @@ export default function App() {
     } catch (err) {
       console.error('Failed to start live:', err);
       stopLive();
+    }
+  };
+
+  const toggleVoice = () => {
+    const newVoice = voiceName === 'Puck' ? 'Aoede' : 'Puck';
+    setVoiceName(newVoice);
+    if (isLive) {
+      // If live, we need to restart to apply voice change
+      stopLive();
+      setTimeout(() => startLive(), 500);
     }
   };
 
@@ -207,6 +218,15 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={toggleVoice}
+            disabled={isInitializing}
+            className="p-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all flex items-center gap-2 text-xs font-bold"
+            title="Switch Voice (Male/Female)"
+          >
+            {voiceName === 'Puck' ? <Volume2 className="w-4 h-4 text-blue-400" /> : <Volume2 className="w-4 h-4 text-pink-400" />}
+            <span className="hidden sm:inline">{voiceName === 'Puck' ? "Male" : "Female"}</span>
+          </button>
           <button 
             onClick={toggleLive}
             disabled={isInitializing || !!configError}
