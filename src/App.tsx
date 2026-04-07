@@ -10,9 +10,11 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [chatService, setChatService] = useState<RajChatService | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
+  const [configError, setConfigError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const audioRecorderRef = useRef<AudioRecorder>(new AudioRecorder());
@@ -20,10 +22,33 @@ export default function App() {
   const liveSessionRef = useRef<any>(null);
 
   useEffect(() => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey) {
-      setChatService(new RajChatService(apiKey));
-    }
+    const initChat = async () => {
+      try {
+        // Try to get key from process.env (Vite define) first
+        let apiKey = process.env.GEMINI_API_KEY;
+        
+        // If not found (common in production Docker/Koyeb), fetch from server
+        if (!apiKey || apiKey === "undefined" || apiKey === "") {
+          const res = await fetch('/api/config');
+          const config = await res.json();
+          apiKey = config.GEMINI_API_KEY;
+        }
+
+        if (apiKey) {
+          setChatService(new RajChatService(apiKey));
+          setConfigError(null);
+        } else {
+          setConfigError("Arree yaar, API Key nahi mil rahi! Koyeb mein GEMINI_API_KEY set karo na baby.");
+        }
+      } catch (err) {
+        console.error('Failed to init chat:', err);
+        setConfigError("Kuch toh gadbad hai... Server se connect nahi ho paa raha.");
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initChat();
     
     return () => {
       stopLive();
@@ -107,10 +132,12 @@ export default function App() {
     }
   };
 
-  const toggleLive = () => {
+  const toggleLive = async () => {
     if (isLive) {
       stopLive();
     } else {
+      // Resume audio context on user gesture
+      await audioStreamerRef.current.resume();
       startLive();
     }
   };
@@ -147,7 +174,6 @@ export default function App() {
 
   const clearChat = () => {
     setMessages([]);
-    const apiKey = process.env.GEMINI_API_KEY;
     if (apiKey) {
       setChatService(new RajChatService(apiKey));
     }
@@ -174,20 +200,31 @@ export default function App() {
         <div className="flex items-center gap-2">
           <button 
             onClick={toggleLive}
+            disabled={isInitializing || !!configError}
             className={cn(
               "p-3 rounded-full transition-all flex items-center gap-2 font-bold text-sm",
               isLive 
                 ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30" 
-                : "bg-pink-600/20 text-pink-400 hover:bg-pink-600/30 border border-pink-500/30"
+                : "bg-pink-600/20 text-pink-400 hover:bg-pink-600/30 border border-pink-500/30",
+              (isInitializing || !!configError) && "opacity-50 cursor-not-allowed"
             )}
             title={isLive ? "Stop Voice Chat" : "Start Voice Chat"}
           >
-            {isLive ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            <span className="hidden md:inline">{isLive ? "Live" : "Voice Chat"}</span>
+            {isInitializing ? (
+              <div className="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+            ) : isLive ? (
+              <MicOff className="w-5 h-5" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
+            <span className="hidden md:inline">
+              {isInitializing ? "Connecting..." : isLive ? "Live" : "Voice Chat"}
+            </span>
           </button>
           <button 
             onClick={clearChat}
-            className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-red-400"
+            disabled={isInitializing}
+            className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-red-400 disabled:opacity-30"
             title="Clear Chat"
           >
             <Trash2 className="w-5 h-5" />
@@ -200,6 +237,22 @@ export default function App() {
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth custom-scrollbar"
       >
+        {isInitializing && (
+          <div className="flex flex-col items-center justify-center h-full space-y-4">
+            <div className="w-10 h-10 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-pink-400 font-medium animate-pulse">Raj ready ho raha hai...</p>
+          </div>
+        )}
+
+        {configError && (
+          <div className="bg-red-500/20 border border-red-500/50 p-4 rounded-xl text-red-200 text-sm mb-4">
+            <p className="font-bold flex items-center gap-2">
+              <Trash2 className="w-4 h-4" /> Oho ho, Error!
+            </p>
+            <p className="mt-1">{configError}</p>
+          </div>
+        )}
+
         {messages.length === 0 && !isLive && (
           <div className="h-full flex flex-col items-center justify-center text-center space-y-6 max-w-md mx-auto">
             <motion.div 
@@ -344,15 +397,19 @@ export default function App() {
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || isInitializing || !!configError}
               className={cn(
                 "p-3 rounded-xl transition-all",
-                input.trim() && !isLoading 
+                input.trim() && !isLoading && !isInitializing && !configError
                   ? "bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20" 
                   : "bg-gray-700 text-gray-400 cursor-not-allowed"
               )}
             >
-              <Send className="w-5 h-5" />
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
             </button>
           </div>
           <p className="text-[10px] text-center mt-3 text-gray-500 uppercase tracking-widest font-bold">

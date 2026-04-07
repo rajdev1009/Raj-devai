@@ -10,7 +10,13 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  // API routes can be added here if needed
+  // API routes
+  app.get("/api/config", (req, res) => {
+    res.json({ 
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY || "" 
+    });
+  });
+
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", message: "Raj is alive and kicking!" });
   });
@@ -24,6 +30,9 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
+    
+    // Serve index.html for all other routes (SPA fallback)
+    // Important: API routes are defined ABOVE this
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });

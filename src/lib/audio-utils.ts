@@ -12,8 +12,15 @@ export class AudioStreamer {
     }
   }
 
-  async play(base64Data: string) {
+  async resume() {
     this.initAudioContext();
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+  }
+
+  async play(base64Data: string) {
+    await this.resume();
     if (!this.audioContext) return;
 
     const binaryString = atob(base64Data);
