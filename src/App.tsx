@@ -14,6 +14,7 @@ export default function App() {
   const [chatService, setChatService] = useState<RajChatService | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [voiceName, setVoiceName] = useState<'Puck' | 'Aoede'>('Puck');
   const [liveTranscript, setLiveTranscript] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export default function App() {
   const audioRecorderRef = useRef<AudioRecorder>(new AudioRecorder());
   const audioStreamerRef = useRef<AudioStreamer>(new AudioStreamer());
   const liveSessionRef = useRef<any>(null);
+  const isUserStopRef = useRef<boolean>(false);
 
   useEffect(() => {
     const initChat = async () => {
@@ -68,10 +70,13 @@ export default function App() {
 
   const stopLive = useCallback(() => {
     setIsLive(false);
+    setIsReconnecting(false);
     audioRecorderRef.current.stop();
     audioStreamerRef.current.stop();
     if (liveSessionRef.current) {
-      liveSessionRef.current.close();
+      try {
+        liveSessionRef.current.close();
+      } catch (e) {}
       liveSessionRef.current = null;
     }
     setLiveTranscript('');
@@ -82,15 +87,23 @@ export default function App() {
     
     try {
       setIsLive(true);
+      setIsReconnecting(false);
+      isUserStopRef.current = false;
+
       const sessionPromise = chatService.connectLive(voiceName, {
         onopen: () => {
           console.log('Live session opened');
           audioRecorderRef.current.start((base64Data) => {
             sessionPromise.then(session => {
-              session.sendRealtimeInput({
-                audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
-              });
-            });
+              if (session && typeof session.sendRealtimeInput === 'function') {
+                session.sendRealtimeInput({
+                  audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+                });
+              }
+            }).catch(err => console.error("Error sending audio:", err));
+          }).catch(err => {
+            console.error("Mic error:", err);
+            stopLive();
           });
         },
         onmessage: (message) => {
@@ -102,8 +115,9 @@ export default function App() {
             setVoiceName(newVoice);
             
             // Restart session with new voice
+            isUserStopRef.current = false;
             stopLive();
-            setTimeout(() => startLive(), 1000);
+            setTimeout(() => startLive(), 500);
             return;
           }
 
@@ -124,7 +138,6 @@ export default function App() {
             setMessages(prev => {
               const lastMsg = prev[prev.length - 1];
               if (lastMsg && lastMsg.role === 'model' && liveTranscript) {
-                // Update last message if it was a model message
                 return [...prev.slice(0, -1), { role: 'model', text: liveTranscript }];
               } else if (liveTranscript) {
                 return [...prev, { role: 'model', text: liveTranscript }];
@@ -136,17 +149,36 @@ export default function App() {
         },
         onerror: (err) => {
           console.error('Live error:', err);
-          stopLive();
+          if (!isUserStopRef.current) {
+            setIsReconnecting(true);
+            setTimeout(() => {
+              if (!isUserStopRef.current) startLive();
+            }, 2000);
+          } else {
+            stopLive();
+          }
         },
         onclose: () => {
           console.log('Live session closed');
-          stopLive();
+          if (!isUserStopRef.current) {
+            setIsReconnecting(true);
+            setTimeout(() => {
+              if (!isUserStopRef.current) startLive();
+            }, 1000);
+          } else {
+            stopLive();
+          }
         }
       });
       liveSessionRef.current = await sessionPromise;
     } catch (err) {
       console.error('Failed to start live:', err);
-      stopLive();
+      if (!isUserStopRef.current) {
+        setIsReconnecting(true);
+        setTimeout(() => startLive(), 3000);
+      } else {
+        stopLive();
+      }
     }
   };
 
@@ -162,8 +194,10 @@ export default function App() {
 
   const toggleLive = async () => {
     if (isLive) {
+      isUserStopRef.current = true;
       stopLive();
     } else {
+      isUserStopRef.current = false;
       // Resume audio context on user gesture
       await audioStreamerRef.current.resume();
       startLive();
@@ -419,14 +453,21 @@ export default function App() {
                   />
                 ))}
               </div>
-              <span className="text-sm font-bold text-red-400">Raj is listening...</span>
+              <span className="text-sm font-bold text-red-400">
+                {isReconnecting ? "Reconnecting Raj..." : "Raj is listening..."}
+              </span>
             </div>
-            <button 
-              onClick={stopLive}
-              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition-all"
-            >
-              End Voice Chat
-            </button>
+            {!isReconnecting && (
+              <button 
+                onClick={() => {
+                  isUserStopRef.current = true;
+                  stopLive();
+                }}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition-all"
+              >
+                End Voice Chat
+              </button>
+            )}
           </motion.div>
         )}
         <div className="max-w-4xl mx-auto relative">
