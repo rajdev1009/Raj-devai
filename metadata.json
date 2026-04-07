@@ -1,0 +1,5 @@
+{
+  "name": "Chat with Raj",
+  "description": "A fun, flirty, and witty chat experience with Raj from Guwahati.",
+  "requestFramePermissions": ["microphone"]
+}
