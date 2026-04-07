@@ -94,6 +94,19 @@ export default function App() {
           });
         },
         onmessage: (message) => {
+          // Handle tool calls (Voice Switching)
+          const toolCall = message.serverContent?.modelTurn?.parts?.[0]?.toolCall as any;
+          if (toolCall?.functionCalls?.[0]?.name === 'switchVoice') {
+            const gender = toolCall.functionCalls[0].args.gender;
+            const newVoice = gender === 'female' ? 'Aoede' : 'Puck';
+            setVoiceName(newVoice);
+            
+            // Restart session with new voice
+            stopLive();
+            setTimeout(() => startLive(), 1000);
+            return;
+          }
+
           // Handle audio output
           const audioData = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (audioData) {
@@ -214,7 +227,9 @@ export default function App() {
                 <span className="w-2 h-2 bg-red-500 rounded-full" title="Disconnected"></span>
               )}
             </h1>
-            <p className="text-xs text-gray-400 font-medium">Lumding ka sabse naughty munda 😉</p>
+            <p className="text-xs text-gray-400 font-medium tracking-wide">
+              Created by <span className="text-pink-400 font-bold">Raj Dev</span> (Astratoonix)
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
