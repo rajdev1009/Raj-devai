@@ -15,6 +15,8 @@ export default function App() {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 3;
   const [voiceName, setVoiceName] = useState<'Puck' | 'Aoede'>('Puck');
   const [liveTranscript, setLiveTranscript] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export default function App() {
   const stopLive = useCallback(() => {
     setIsLive(false);
     setIsReconnecting(false);
+    reconnectAttemptsRef.current = 0;
     audioRecorderRef.current.stop();
     audioStreamerRef.current.stop();
     if (liveSessionRef.current) {
@@ -87,12 +90,14 @@ export default function App() {
     
     try {
       setIsLive(true);
-      setIsReconnecting(false);
       isUserStopRef.current = false;
 
       const sessionPromise = chatService.connectLive(voiceName, {
         onopen: () => {
           console.log('Live session opened');
+          setIsReconnecting(false);
+          reconnectAttemptsRef.current = 0;
+          
           audioRecorderRef.current.start((base64Data) => {
             sessionPromise.then(session => {
               if (session && typeof session.sendRealtimeInput === 'function') {
@@ -117,7 +122,7 @@ export default function App() {
             // Restart session with new voice
             isUserStopRef.current = false;
             stopLive();
-            setTimeout(() => startLive(), 500);
+            setTimeout(() => startLive(), 800);
             return;
           }
 
@@ -149,36 +154,39 @@ export default function App() {
         },
         onerror: (err) => {
           console.error('Live error:', err);
-          if (!isUserStopRef.current) {
-            setIsReconnecting(true);
-            setTimeout(() => {
-              if (!isUserStopRef.current) startLive();
-            }, 2000);
-          } else {
-            stopLive();
-          }
+          handleReconnect();
         },
         onclose: () => {
           console.log('Live session closed');
-          if (!isUserStopRef.current) {
-            setIsReconnecting(true);
-            setTimeout(() => {
-              if (!isUserStopRef.current) startLive();
-            }, 1000);
-          } else {
-            stopLive();
-          }
+          handleReconnect();
         }
       });
       liveSessionRef.current = await sessionPromise;
     } catch (err) {
       console.error('Failed to start live:', err);
-      if (!isUserStopRef.current) {
-        setIsReconnecting(true);
-        setTimeout(() => startLive(), 3000);
-      } else {
-        stopLive();
-      }
+      handleReconnect();
+    }
+  };
+
+  const handleReconnect = () => {
+    if (isUserStopRef.current) {
+      stopLive();
+      return;
+    }
+
+    if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+      reconnectAttemptsRef.current += 1;
+      setIsReconnecting(true);
+      console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts})...`);
+      
+      const delay = reconnectAttemptsRef.current * 2000;
+      setTimeout(() => {
+        if (!isUserStopRef.current) startLive();
+      }, delay);
+    } else {
+      console.error("Max reconnect attempts reached.");
+      stopLive();
+      setConfigError("Raj thoda thak gaya hai... Connection baar-baar toot raha hai. Ek baar page refresh karke dekho?");
     }
   };
 

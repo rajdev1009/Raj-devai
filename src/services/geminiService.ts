@@ -71,13 +71,10 @@ export class RajChatService {
     }
   ) {
     return this.ai.live.connect({
-      model: "gemini-2.0-flash-exp", // Using 2.0 Flash for better tool support in Live
+      model: "gemini-3.1-flash-live-preview",
       callbacks,
       config: {
         tools: [
-          {
-            googleSearch: {},
-          },
           {
             functionDeclarations: [
               {
