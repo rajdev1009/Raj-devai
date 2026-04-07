@@ -1,20 +1,22 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Hosting on Koyeb
 
-# Run and deploy your AI Studio app
+To host this app on Koyeb, follow these steps:
 
-This contains everything you need to run your app locally.
+1.  **Push to GitHub:** Push this code to a GitHub repository.
+2.  **Create App on Koyeb:**
+    *   Go to [Koyeb Console](https://app.koyeb.com/).
+    *   Click **Create Service**.
+    *   Select **GitHub** and choose your repository.
+3.  **Configure Environment Variables:**
+    *   Add a new environment variable:
+        *   **Key:** `GEMINI_API_KEY`
+        *   **Value:** `YOUR_REAL_TIME_API_KEY` (Paste your Gemini API key here)
+4.  **Build & Run Settings:**
+    *   Koyeb will automatically detect the `Dockerfile`.
+    *   If you want to use the buildpack instead:
+        *   **Build Command:** `npm install && npm run build`
+        *   **Run Command:** `npm start`
+    *   **Port:** `3000`
+5.  **Deploy:** Click **Deploy**.
 
-View your app in AI Studio: https://ai.studio/apps/cea4ba99-9b5b-4dc1-bfd8-ad8e2c24d99e
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Raj will be live on your Koyeb URL! 😉
