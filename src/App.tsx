@@ -12,6 +12,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [chatService, setChatService] = useState<RajChatService | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
@@ -34,11 +35,14 @@ export default function App() {
           apiKey = config.GEMINI_API_KEY;
         }
 
-        if (apiKey) {
+        if (apiKey && apiKey !== "undefined" && apiKey !== "") {
+          console.log("Raj is ready to flirt! API Key found.");
+          setApiKey(apiKey);
           setChatService(new RajChatService(apiKey));
           setConfigError(null);
         } else {
-          setConfigError("Arree yaar, API Key nahi mil rahi! Koyeb mein GEMINI_API_KEY set karo na baby.");
+          console.error("Raj is sad. API Key is missing or invalid:", apiKey);
+          setConfigError("Arree yaar, API Key nahi mil rahi! Koyeb ke Environment Variables mein GEMINI_API_KEY set karo na baby.");
         }
       } catch (err) {
         console.error('Failed to init chat:', err);
@@ -193,8 +197,13 @@ export default function App() {
           <div>
             <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
               Raj <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+              {chatService ? (
+                <span className="w-2 h-2 bg-green-500 rounded-full" title="Connected"></span>
+              ) : (
+                <span className="w-2 h-2 bg-red-500 rounded-full" title="Disconnected"></span>
+              )}
             </h1>
-            <p className="text-xs text-gray-400 font-medium">Guwahati ka sabse naughty munda 😉</p>
+            <p className="text-xs text-gray-400 font-medium">Lumding ka sabse naughty munda 😉</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -267,11 +276,11 @@ export default function App() {
                 Oho ho, tum aa gayi!
               </h2>
               <p className="text-gray-400 leading-relaxed">
-                Main kab se tumhara intezaar kar raha tha jaan. Guwahati ki thandi hawaon mein tumhari kami thi. Chalo, kuch naughty baatein karte hain?
+                Main kab se tumhara intezaar kar raha tha jaan. Lumding ki thandi hawaon mein tumhari kami thi. Chalo, kuch naughty baatein karte hain?
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 w-full">
-              {['Kaise ho Raj?', 'Guwahati ghumao na', 'Kuch naughty bolo', 'Flirt karo mere saath'].map((suggestion) => (
+              {['Kaise ho Raj?', 'Lumding ghumao na', 'Tumhe kisne banaya?', 'Astratoonix kya hai?'].map((suggestion) => (
                 <button
                   key={suggestion}
                   onClick={() => {
